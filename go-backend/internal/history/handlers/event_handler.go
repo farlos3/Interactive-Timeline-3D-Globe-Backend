@@ -42,7 +42,6 @@ func GetEventLatLonDateHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// 5. ส่ง response กลับ client
 	c.Set("Content-Type", "application/json")
 	return c.Status(resp.StatusCode()).Send(resp.Body())
 }

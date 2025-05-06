@@ -1,24 +1,15 @@
-from fastapi import FastAPI, Request
+# router.py
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-
 import json
 
-app = FastAPI()
+router = APIRouter()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
+@router.get("/")
 async def root():
     return {"message": "Python Service is running"}
 
-@app.post("/process")
+@router.post("/process")
 async def process_data(request: Request):
     body = await request.body()
     if not body:
@@ -28,7 +19,3 @@ async def process_data(request: Request):
     print("=== Data received from GO ===")
     print(json.dumps(data, indent=4, ensure_ascii=False))
     return JSONResponse(content={"status": "success", "received": data})
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)

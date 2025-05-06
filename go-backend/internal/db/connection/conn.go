@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -14,7 +15,8 @@ var DB *pgxpool.Pool
 // ConnectDB ทำหน้าที่เชื่อมต่อกับฐานข้อมูล Supabase
 func ConnectDB() error {
 	// โหลด .env ก่อนใช้งาน
-	if err := godotenv.Load(); err != nil {
+	envPath := filepath.Join("..", ".env")
+	if err := godotenv.Load(envPath); err != nil {
 		return err
 	}
 

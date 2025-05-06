@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"path/filepath"
 
 	"globe/internal/db/connection"
 	"globe/routes"
@@ -11,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -40,10 +42,14 @@ func main() {
 	}
 	log.Println("✅ Database connected successfully")
 
-	// ลงทะเบียน routes ทั้งหมด
 	routes.RegisterRoutes(app)
+	// routes.RegisterTestRoutes(app)
 
-	// กำหนด port จาก environment variable หรือใช้ค่า default
+	envPath := filepath.Join("..", ".env")
+	if err := godotenv.Load(envPath); err != nil {
+		log.Fatalf("❌ Failed to load .env file from %s: %v", envPath, err)
+	}
+
 	goPort := os.Getenv("GO_PORT")
 
 	// รัน server

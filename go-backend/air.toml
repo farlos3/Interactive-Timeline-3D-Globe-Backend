@@ -1,0 +1,17 @@
+# .air.toml
+
+root = "."
+
+[include]
+  extensions = ["go", "tpl", "tmpl", "html"]
+
+[exclude_dir]
+  folders = ["assets", "tmp", "vendor", "node_modules"]
+
+[build]
+  cmd = "go run ."
+  bin = ""  # ไม่กำหนดที่เก็บไฟล์ binary
+  full_bin = "APP_ENV=development go run ."
+
+[log]
+  time = true

@@ -34,3 +34,6 @@ tmp/
 
 # Ignore environment variables file (.env)
 .env
+
+# Python bytecode cache
+__pycache__/

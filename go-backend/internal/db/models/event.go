@@ -37,12 +37,13 @@ type EventResponse struct {
 }
 
 type Cluster struct {
-	ClusterID       int       `json:"cluster_id"`
-	ParentClusterID *int      `json:"parent_cluster_id"`
-	CentroidLat     float64   `json:"centroid_lat"`
-	CentroidLon     float64   `json:"centroid_lon"`
-	CentroidTime    time.Time `json:"centroid_time"`
-	Level           int       `json:"level"`
-	GroupTag        string    `json:"group_tag"`
-	BoundingBox     string    `json:"bounding_box"`
+	ClusterID        int     `json:"cluster_id"`
+	ParentClusterID  *int    `json:"parent_cluster_id"`
+	CentroidLat      float64 `json:"centroid_lat"`
+	CentroidLon      float64 `json:"centroid_lon"`
+	CentroidTimeDays string  `json:"centroid_time_days"`
+	Level            int     `json:"level"`
+	GroupTag         string  `json:"group_tag"`
+	BoundingBox      string  `json:"bounding_box"`
+	EventIDs         []int   `json:"event_ids"`
 }

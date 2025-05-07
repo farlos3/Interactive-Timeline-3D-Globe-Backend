@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	// Cofig logging
+	// Config logging
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Println("🚀 Starting Globe API Server...")
 
@@ -26,7 +26,7 @@ func main() {
 		IdleTimeout:  5 * time.Second,
 	})
 
-	// เพิ่ม middleware
+	// middleware
 	app.Use(recover.New())
 	app.Use(logger.New(logger.Config{
 		Format:     "${time} | ${status} | ${latency} | ${method} | ${path}\n",

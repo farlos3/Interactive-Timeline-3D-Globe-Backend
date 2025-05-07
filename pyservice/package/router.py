@@ -25,8 +25,8 @@ async def process_data(request: Request):
             )
 
         data = await request.json()
-        # print("=== Data received from GO ===")
-        # print(json.dumps(data, indent=4, ensure_ascii=False))
+        print("=== Data received from GO ===")
+        print(json.dumps(data, indent=4, ensure_ascii=False))
 
         # ตรวจสอบรูปแบบข้อมูล
         if not isinstance(data, dict) or 'events' not in data:
@@ -61,7 +61,7 @@ async def process_data(request: Request):
                     date_str = date_str.split('T')[0] 
                 event['Date'] = date_str
                 
-                datetime.strptime(date_str, "%Y-%m-%d")  # ตรวจสอบรูปแบบวันที่
+                datetime.strptime(date_str, "%Y-%m-%d")
             except ValueError as e:
                 return JSONResponse(
                     content={

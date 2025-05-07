@@ -39,7 +39,7 @@ async def process_data(request: Request):
         events = data['events']
         for idx, event in enumerate(events):
             # ตรวจสอบฟิลด์ที่จำเป็น
-            required_fields = ['EventID', 'Lat', 'Lon', 'Date']
+            required_fields = ['event_id', 'lat', 'lon', 'date']
             missing_fields = [field for field in required_fields if field not in event]
             if missing_fields:
                 return JSONResponse(
@@ -52,16 +52,9 @@ async def process_data(request: Request):
             
             # ตรวจสอบประเภทข้อมูล
             try:
-                float(event['Lat']) 
-                float(event['Lon']) 
-                
-                # Preprocess วันที่
-                date_str = event['Date']
-                if 'T' in date_str:
-                    date_str = date_str.split('T')[0] 
-                event['Date'] = date_str
-                
-                datetime.strptime(date_str, "%Y-%m-%d")  # ตรวจสอบรูปแบบวันที่
+                float(event['lat'])  # ตรวจสอบว่า lat เป็นตัวเลข
+                float(event['lon'])  # ตรวจสอบว่า lon เป็นตัวเลข
+                datetime.strptime(event['date'], "%Y-%m-%d")  # ตรวจสอบรูปแบบวันที่
             except ValueError as e:
                 return JSONResponse(
                     content={

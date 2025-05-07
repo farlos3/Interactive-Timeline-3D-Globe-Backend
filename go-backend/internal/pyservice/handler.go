@@ -26,7 +26,6 @@ func (h *Handler) ProcessEvent(c *fiber.Ctx) error {
 	startTime := time.Now()
 	log.Printf("[Python Service] Starting to process request from %s", c.IP())
 
-	// ดึงข้อมูลจาก database
 	events, err := repository.GetEventLatLonDate()
 	if err != nil {
 		log.Printf("[Python Service] Error fetching events: %v", err)
@@ -46,11 +45,9 @@ func (h *Handler) ProcessEvent(c *fiber.Ctx) error {
 		})
 	}
 
-	// คำนวณเวลาที่ใช้ในการประมวลผล
 	processingTime := time.Since(startTime)
 	log.Printf("[Python Service] Request processed successfully in %v", processingTime)
 	log.Printf("[Python Service] Result: %+v", result)
 
-	// ส่งผลลัพธ์กลับไปยัง client
 	return c.JSON(result)
 }

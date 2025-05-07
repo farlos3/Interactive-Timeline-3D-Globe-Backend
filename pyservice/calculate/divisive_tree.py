@@ -105,3 +105,24 @@ def get_leaf_clusters(node):
     for child in node.children:
         leaves.extend(get_leaf_clusters(child))
     return leaves
+
+def get_leaf_clusters_with_level(node, level=0):
+    """
+    Get leaf clusters with their level in the tree
+    Returns list of tuples (node, level)
+    """
+    if node.is_leaf:
+        return [(node, level)]
+    leaves = []
+    for child in node.children:
+        leaves.extend(get_leaf_clusters_with_level(child, level + 1))
+    return leaves
+
+def leaf_to_cluster_dict(node):
+    """
+    Convert leaf nodes to a dictionary mapping cluster labels to their data
+    """
+    result = {}
+    for leaf in get_leaf_clusters(node):
+        result[leaf.label] = leaf.pairs
+    return result

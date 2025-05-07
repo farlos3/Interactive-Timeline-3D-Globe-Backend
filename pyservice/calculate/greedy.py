@@ -9,7 +9,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def greedy_closest_pair_kdtree_grouping(events, k):
-    logging.info("Start grouping with k = %d", k)
+    # logging.info("Start grouping with k = %d", k)
 
     # สร้าง mapping ระหว่าง index และ event id
     event_id_map = {i: event['EventID'] for i, event in enumerate(events)}
@@ -19,7 +19,7 @@ def greedy_closest_pair_kdtree_grouping(events, k):
 
     min_date = min(date_str)
     max_date = max(date_str)
-    logging.info("Datetime range: %s to %s", min_date, max_date)
+    # logging.info("Datetime range: %s to %s", min_date, max_date)
     
     points_3d = [create_feature_vector(event['Lat'], event['Lon'], event['Date'], min_date) for event in events]
     
@@ -31,7 +31,7 @@ def greedy_closest_pair_kdtree_grouping(events, k):
     seeds = []
 
     # --- Step 1: เลือก seed เริ่มต้นโดยใช้ Closest Pair ---
-    logging.info("Selecting initial seed pair using Closest Pair")
+    # logging.info("Selecting initial seed pair using Closest Pair")
     Px = merge_sort(list(zip(points_3d, range(n))), 0)
     Py = merge_sort(list(zip(points_3d, range(n))), 2)
     d, A, B = closest_pair([p for p, _ in Px], [p for p, _ in Py])
@@ -78,7 +78,7 @@ def greedy_closest_pair_kdtree_grouping(events, k):
         seeds.append(best_idx)
         used_idxs.add(best_idx)
 
-    logging.info("Seeds selected: %s", [event_id_map[idx] for idx in seeds])
+    # logging.info("Seeds selected: %s", [event_id_map[idx] for idx in seeds])
 
     # --- Step 3: จัดกลุ่มตาม seeds ด้วย Greedy KDTree Query ---
     for group_idx, seed_idx in enumerate(seeds):
@@ -89,7 +89,7 @@ def greedy_closest_pair_kdtree_grouping(events, k):
     target_group_size = n // k
 
     for group_idx, seed_idx in enumerate(seeds):
-        logging.info("Expanding group %d (seed event id: %d)", group_idx, event_id_map[seed_idx])
+        # logging.info("Expanding group %d (seed event id: %d)", group_idx, event_id_map[seed_idx])
         while len(groups[group_idx]) < target_group_size and remaining_idxs:
             # ค้นหา point ที่ใกล้ที่สุดกับ seed ของกลุ่มนี้
             dists, idxs = tree.query(points_3d[seed_idx], k=n)
@@ -108,7 +108,7 @@ def greedy_closest_pair_kdtree_grouping(events, k):
         smallest_group_idx = min(range(k), key=lambda g: len(groups[g]))
         groups[smallest_group_idx].append(events[idx])
         visited[idx] = True
-        logging.debug("Added leftover event id %d to group %d", event_id_map[idx], smallest_group_idx)
+        # logging.debug("Added leftover event id %d to group %d", event_id_map[idx], smallest_group_idx)
 
-    logging.info("Grouping completed.")
+    # logging.info("Grouping completed.")
     return groups

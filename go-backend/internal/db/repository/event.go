@@ -30,10 +30,11 @@ func GetFilteredEvents(filter models.EventFilter) ([]models.EventResponse, error
 		WHERE 1=1
 	`
 
-	// 2. เพิ่มเงื่อนไข filter tags
+	// 2. เพิ่มเงื่อนไข filter tags และ date
 	args := []interface{}{}
 	argCount := 1
 
+	// 2.1 เพิ่มเงื่อนไข filter tags
 	if filter.TagFilter != nil {
 		if len(filter.TagFilter.Tags) > 0 {
 			operator := filter.TagFilter.Operator
@@ -59,11 +60,34 @@ func GetFilteredEvents(filter models.EventFilter) ([]models.EventResponse, error
 		}
 	}
 
+	// 2.2 เพิ่มเงื่อนไข filter date
+	if filter.DateFilter != nil {
+		if filter.DateFilter.Year != nil {
+			query += fmt.Sprintf(" AND EXTRACT(YEAR FROM e.date) = $%d", argCount)
+			args = append(args, *filter.DateFilter.Year)
+			argCount++
+		} else {
+			if filter.DateFilter.StartDate != nil {
+				query += fmt.Sprintf(" AND e.date >= $%d", argCount)
+				args = append(args, filter.DateFilter.StartDate)
+				argCount++
+			}
+			if filter.DateFilter.EndDate != nil {
+				query += fmt.Sprintf(" AND e.date <= $%d", argCount)
+				args = append(args, filter.DateFilter.EndDate)
+				argCount++
+			}
+		}
+	}
+
 	// 3. Group by และ order by
 	query += `
 		GROUP BY e.event_id, e.event_name, e.date, e.lat, e.lon, e.description
 		ORDER BY e.date DESC
 	`
+
+	// Debug: Print query and args
+	log.Printf("[DEBUG] Args: %v", args)
 
 	// 4. Execute query
 	rows, err := connection.DB.Query(context.Background(), query, args...)
@@ -97,6 +121,9 @@ func GetFilteredEvents(filter models.EventFilter) ([]models.EventResponse, error
 		log.Printf("[ERROR] Rows error: %v", err)
 		return nil, err
 	}
+
+	// Debug: Print number of results
+	log.Printf("[DEBUG] Found %d events", len(events))
 
 	for i := range events {
 		if math.IsNaN(events[i].Lat) {

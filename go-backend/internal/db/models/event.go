@@ -50,17 +50,26 @@ type Viewport struct {
 	West  float64 `json:"west"`  // longitude ของขอบซ้าย
 }
 
-type ClusterQuery struct {
-	Viewport    Viewport   `json:"viewport"`     // viewport ที่ user เห็น
-	MaxLevel    int        `json:"max_level"`    // ระดับสูงสุดที่ต้องการ (0-2)
-	TagFilter   *TagFilter `json:"tag_filter"`   // filter ด้วย tags
-	MaxClusters *int       `json:"max_clusters"` // จำนวน clusters สูงสุดที่ต้องการ
+type DateFilter struct {
+	StartDate *time.Time `json:"start_date"` // วันที่เริ่มต้น
+	EndDate   *time.Time `json:"end_date"`   // วันที่สิ้นสุด
+	Year      *int       `json:"year"`       // ปีที่ต้องการ filter
 }
+
+type ClusterQuery struct {
+	Viewport    Viewport    `json:"viewport"`     // viewport ที่ user เห็น
+	MaxLevel    int         `json:"max_level"`    // ระดับสูงสุดที่ต้องการ (0-2)
+	TagFilter   *TagFilter  `json:"tag_filter"`   // filter ด้วย tags
+	DateFilter  *DateFilter `json:"date_filter"`  // filter ด้วยวันที่
+	MaxClusters *int        `json:"max_clusters"` // จำนวน clusters สูงสุดที่ต้องการ
+}
+
 type TagFilter struct {
-	Tags     []string `json:"tags"`     // รายการ tags ที่ต้องการ filter
-	Operator string   `json:"operator"` // "AND" หรือ "OR" (default: "OR")
+	Tags     []string `json:"tags"`
+	Operator string   `json:"operator"`
 }
 
 type EventFilter struct {
-	TagFilter *TagFilter `json:"tag_filter"` // ตัวเลือกสำหรับ filter tags
+	TagFilter  *TagFilter  `json:"tag_filter"`  // ตัวเลือกสำหรับ filter tags
+	DateFilter *DateFilter `json:"date_filter"` // ตัวเลือกสำหรับ filter วันที่
 }

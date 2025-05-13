@@ -109,6 +109,7 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 	}
 	argCount := 6
 
+	// 2.1 เพิ่มเงื่อนไข filter tags
 	if query.TagFilter != nil {
 		if len(query.TagFilter.Tags) > 0 {
 			operator := query.TagFilter.Operator
@@ -130,6 +131,26 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 					argCount++
 				}
 				filterConditions += " AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id JOIN eventtag et ON e.event_id = et.event_id JOIN tag t ON et.tag_id = t.tag_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND (" + strings.Join(orConds, " OR ") + "))"
+			}
+		}
+	}
+
+	// 2.2 เพิ่มเงื่อนไข filter date
+	if query.DateFilter != nil {
+		if query.DateFilter.Year != nil {
+			filterConditions += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND EXTRACT(YEAR FROM e.date) = $%d)", argCount)
+			args = append(args, *query.DateFilter.Year)
+			argCount++
+		} else {
+			if query.DateFilter.StartDate != nil {
+				filterConditions += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND e.date >= $%d)", argCount)
+				args = append(args, query.DateFilter.StartDate)
+				argCount++
+			}
+			if query.DateFilter.EndDate != nil {
+				filterConditions += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND e.date <= $%d)", argCount)
+				args = append(args, query.DateFilter.EndDate)
+				argCount++
 			}
 		}
 	}

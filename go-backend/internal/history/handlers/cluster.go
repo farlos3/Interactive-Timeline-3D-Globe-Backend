@@ -31,3 +31,37 @@ func InsertClustersHandler(c *fiber.Ctx) error {
 		"message": "Clusters inserted successfully",
 	})
 }
+
+func GetHierarchicalClustersHandler(c *fiber.Ctx) error {
+	var query models.ClusterQuery
+
+	// Parse request body into query struct
+	if err := c.BodyParser(&query); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Invalid query parameters",
+		})
+	}
+
+	// Validate required fields
+	if query.MaxLevel < 0 || query.MaxLevel > 4 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "error",
+			"message": "MaxLevel must be between 0 and 4",
+		})
+	}
+
+	// Get hierarchical clusters
+	clusters, err := repository.GetHierarchicalClusters(query)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":  "error",
+			"message": "Failed to fetch hierarchical clusters",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": "success",
+		"data":   clusters,
+	})
+}

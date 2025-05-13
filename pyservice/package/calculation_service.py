@@ -54,7 +54,6 @@ class CalculationService:
                         event = p[1]
                         event_clusters[event['EventID']] = cluster_id
 
-        # สร้างผลลัพธ์
         result = {
             "total_events": len(events),
             "total_clusters": len(all_cluster_dicts),

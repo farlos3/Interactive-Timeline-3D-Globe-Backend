@@ -1,78 +1,89 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"time"
-	"encoding/json"
 
-	"globe/internal/history/service"
 	"globe/internal/db/models"
-    "globe/internal/db/repository"
+	"globe/internal/db/repository"
+	"globe/internal/history/service"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/gofiber/fiber/v2"
 )
 
 func GetEventLatLonDateHandler(c *fiber.Ctx) error {
-    events, err := service.GetEventLatLonDate()
-    if err != nil {
-        log.Println("Error fetching event lat, lon, date:", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Failed to fetch event lat, lon, date",
-        })
-    }
+	events, err := service.GetEventLatLonDate()
+	if err != nil {
+		log.Println("Error fetching event lat, lon, date:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch event lat, lon, date",
+		})
+	}
 
-    pyPort := os.Getenv("PY_PORT")
-    pythonURL := fmt.Sprintf("http://localhost:%s/process", pyPort)
+	// ตรวจสอบและแก้ไขค่า NaN ใน events
+	for i := range events {
+		if math.IsNaN(events[i].Lat) {
+			events[i].Lat = 0 // หรือค่าที่เหมาะสม
+		}
+		if math.IsNaN(events[i].Lon) {
+			events[i].Lon = 0
+		}
+	}
 
-    requestBody := fiber.Map{
-        "events": events,
-    }
+	pyPort := os.Getenv("PY_PORT")
+	pythonURL := fmt.Sprintf("http://localhost:%s/process", pyPort)
 
-    client := resty.New().SetTimeout(10 * time.Second)
+	requestBody := fiber.Map{
+		"events": events,
+	}
 
-    resp, err := client.R().
-        SetHeader("Content-Type", "application/json").
-        SetBody(requestBody).
-        Post(pythonURL)
+	client := resty.New().SetTimeout(10 * time.Second)
 
-    if err != nil {
-        log.Println("Error sending request to Python:", err)
-        return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-            "error": "Failed to send data to Python service",
-        })
-    }
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(requestBody).
+		Post(pythonURL)
 
-    // 1. Decode response body เป็น struct
-    var pyResp struct {
-        Status string `json:"status"`
-        Data struct {
-            Clusters []models.Cluster `json:"clusters"`
-            // ... field อื่นๆ ถ้าต้องการ
-        } `json:"data"`
-    }
+	if err != nil {
+		log.Println("Error sending request to Python:", err)
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error": "Failed to send data to Python service",
+		})
+	}
 
-    if err := json.Unmarshal(resp.Body(), &pyResp); err != nil {
-        log.Println("Error decoding Python response:", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Invalid response from Python service",
-        })
-    }
+	// 1. Decode response body เป็น struct
+	var pyResp struct {
+		Status string `json:"status"`
+		Data   struct {
+			Clusters []models.Cluster `json:"clusters"`
+			// ... field อื่นๆ ถ้าต้องการ
+		} `json:"data"`
+	}
 
-    // 2. Insert clusters ลง DB
-    if err := repository.InsertClustersAndMappings(pyResp.Data.Clusters); err != nil {
-        log.Println("Error inserting clusters:", err)
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Failed to insert clusters",
-        })
-    }
+	if err := json.Unmarshal(resp.Body(), &pyResp); err != nil {
+		log.Println("Error decoding Python response:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Invalid response from Python service",
+		})
+	}
 
-    // 3. ส่ง response กลับ client (หรือจะส่ง pyResp กลับไปเลยก็ได้)
-    return c.Status(fiber.StatusOK).JSON(fiber.Map{
-        "status":  "success",
-        "message": "Clusters inserted successfully",
-        "clusters": pyResp.Data.Clusters,
-    })
+	// 2. Insert clusters ลง DB
+	if err := repository.InsertClustersAndMappings(pyResp.Data.Clusters); err != nil {
+		log.Println("Error inserting clusters:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to insert clusters",
+		})
+	}
+
+	// 3. ส่ง response กลับ client (หรือจะส่ง pyResp กลับไปเลยก็ได้)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":   "success",
+		"message":  "Clusters inserted successfully",
+		"clusters": pyResp.Data.Clusters,
+	})
 }

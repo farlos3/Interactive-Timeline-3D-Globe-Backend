@@ -25,8 +25,6 @@ async def process_data(request: Request):
             )
 
         data = await request.json()
-        print("=== Data received from GO ===")
-        print(json.dumps(data, indent=4, ensure_ascii=False))
 
         # ตรวจสอบรูปแบบข้อมูล
         if not isinstance(data, dict) or 'events' not in data:

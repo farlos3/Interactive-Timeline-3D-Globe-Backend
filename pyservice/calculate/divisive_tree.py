@@ -79,18 +79,18 @@ def divisive_custom_tree(pairs, min_cluster_size, label_counter=None, depth=0):
     if len(pairs) < min_cluster_size:
         label = f"C{label_counter['count']}"
         label_counter['count'] += 1
-        print(f"{indent}Leaf: {label}, size = {len(pairs)}")
+        # print(f"{indent}Leaf: {label}, size = {len(pairs)}")
         return ClusterNode(pairs, label=label)
 
     # แบ่งกลุ่มด้วย Closest Pair
     g1, g2 = split_cluster_pairs_using_closest_pair(pairs)
-    print(f"{indent}Split: size = {len(pairs)}, g1 = {len(g1)}, g2 = {len(g2)}")
+    # print(f"{indent}Split: size = {len(pairs)}, g1 = {len(g1)}, g2 = {len(g2)}")
 
     # ถ้าแบ่งไม่สำเร็จ (เช่นก1 หรือ ก2 ว่าง)
     if not g1 or not g2:
         label = f"C{label_counter['count']}"
         label_counter['count'] += 1
-        print(f"{indent}Unsplitable: {label}, size = {len(pairs)}")
+        # print(f"{indent}Unsplitable: {label}, size = {len(pairs)}")
         return ClusterNode(pairs, label=label)
 
     # สร้างโหนดลูกแบบ recursive
@@ -147,24 +147,6 @@ def calculate_centroid(pairs):
     centroid_lon = float(np.mean(lons)) if lons else 0.0
     return centroid_lat, centroid_lon
 
-def calculate_bounding_box(events):
-    lats = []
-    lons = []
-    for event in events:
-        lat = event.get('lat', event.get('Lat'))
-        lon = event.get('lon', event.get('Lon'))
-        try:
-            lats.append(float(lat))
-            lons.append(float(lon))
-        except Exception:
-            continue
-    if not lats or not lons:
-        return ""
-    min_lat, max_lat = min(lats), max(lats)
-    min_lon, max_lon = min(lons), max(lons)
-    # WKT POLYGON (lon lat)
-    return f"POLYGON(({min_lon} {min_lat}, {min_lon} {max_lat}, {max_lon} {max_lat}, {max_lon} {min_lat}, {min_lon} {min_lat}))"
-
 def calculate_centroid_days(pairs, min_date):
     days = []
     for _, event in pairs:
@@ -209,8 +191,6 @@ def cluster_tree_to_dict(node, parent_id=None, level=0, cluster_list=None, id_co
 
     centroid_lat, centroid_lon = calculate_centroid(node.pairs)
     centroid_time_days = str(calculate_centroid_days(node.pairs, min_date))
-    group_tag = ""
-    bounding_box = calculate_bounding_box([event for _, event in node.pairs])
     event_ids = [event.get('EventID', event.get('event_id')) for _, event in node.pairs]
 
     cluster_list.append({
@@ -220,8 +200,6 @@ def cluster_tree_to_dict(node, parent_id=None, level=0, cluster_list=None, id_co
         "centroid_lon": centroid_lon,
         "centroid_time_days": centroid_time_days,
         "level": level,
-        "group_tag": group_tag,
-        "bounding_box": bounding_box,
         "event_ids": event_ids
     })
 

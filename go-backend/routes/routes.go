@@ -20,6 +20,8 @@ func RegisterRoutes(app *fiber.App) {
 	api := app.Group("/api")
 	api.Post("/events-lat-lon-date", handler.GetEventLatLonDateHandler)
 	api.Post("/insert-clusters", handler.InsertClustersHandler)
+	api.Post("/events/filter", handler.GetFilteredEventsHandler)
+	api.Post("/clusters/hierarchical", handler.GetHierarchicalClustersHandler)
 
 	// Python service routes
 	pythonHandler := pyservice.NewHandler()

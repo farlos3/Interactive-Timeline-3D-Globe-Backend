@@ -67,7 +67,7 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 		FROM cluster c
 		LEFT JOIN eventclustermap ecm ON c.cluster_id = ecm.cluster_id
 		WHERE c.level <= $1
-		GROUP BY c.cluster_id, c.parent_cluster_id, c.centroid_lat, c.centroid_lon, c.centroid_time_days, c.level, c.min_lat, c.max_lat, c.min_lon, c.max_lon, c.min_date, c.max_date
+		GROUP BY c.cluster_id, c.parent_cluster_id, c.centroid_lat, c.centroid_lon, c.centroid_time_days, c.level, c.		min_lat, c.max_lat, c.min_lon, c.max_lon, c.min_date, c.max_date
 	`
 	rows, err := connection.DB.Query(context.Background(), baseQuery, query.MaxLevel)
 	if err != nil {

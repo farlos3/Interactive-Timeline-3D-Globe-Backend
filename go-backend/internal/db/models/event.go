@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type Event struct {
 	EventID     int       `json:"event_id"`
@@ -34,13 +36,19 @@ type EventResponse struct {
 }
 
 type Cluster struct {
-	ClusterID        int     `json:"cluster_id"`
-	ParentClusterID  *int    `json:"parent_cluster_id"`
-	CentroidLat      float64 `json:"centroid_lat"`       // จุดศูนย์กลางละติจูด
-	CentroidLon      float64 `json:"centroid_lon"`       // จุดศูนย์กลางลองจิจูด
-	CentroidTimeDays string  `json:"centroid_time_days"` // จุดศูนย์กลางเวลา
-	Level            int     `json:"level"`
-	EventIDs         []int   `json:"event_ids"`
+	ClusterID        int        `json:"cluster_id"`
+	ParentClusterID  *int       `json:"parent_cluster_id"`
+	CentroidLat      float64    `json:"centroid_lat"`
+	CentroidLon      float64    `json:"centroid_lon"`
+	CentroidTimeDays string     `json:"centroid_time_days"`
+	Level            int        `json:"level"`
+	EventIDs         []int      `json:"event_ids"`
+	MinLat           *float64   `json:"min_lat"`
+	MaxLat           *float64   `json:"max_lat"`
+	MinLon           *float64   `json:"min_lon"`
+	MaxLon           *float64   `json:"max_lon"`
+	MinDate          *time.Time `json:"min_date"`
+	MaxDate          *time.Time `json:"max_date"`
 }
 
 type Viewport struct {
@@ -58,7 +66,7 @@ type DateFilter struct {
 
 type ClusterQuery struct {
 	Viewport    Viewport    `json:"viewport"`     // viewport ที่ user เห็น
-	MaxLevel    int         `json:"max_level"`    // ระดับสูงสุดที่ต้องการ (0-2)
+	MaxLevel    int         `json:"max_level"`    // ระดับสูงสุดที่ต้องการ (0-4)
 	TagFilter   *TagFilter  `json:"tag_filter"`   // filter ด้วย tags
 	DateFilter  *DateFilter `json:"date_filter"`  // filter ด้วยวันที่
 	MaxClusters *int        `json:"max_clusters"` // จำนวน clusters สูงสุดที่ต้องการ

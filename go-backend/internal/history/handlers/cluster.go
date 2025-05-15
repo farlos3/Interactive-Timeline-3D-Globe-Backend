@@ -43,7 +43,12 @@ func GetHierarchicalClustersHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate required fields
+	// Set default max_level to 4 if not provided
+	if query.MaxLevel == 0 {
+		query.MaxLevel = 4
+	}
+
+	// Validate max_level
 	if query.MaxLevel < 0 || query.MaxLevel > 4 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"status":  "error",

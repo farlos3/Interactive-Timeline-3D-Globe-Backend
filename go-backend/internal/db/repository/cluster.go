@@ -2,9 +2,8 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"strings"
+	"time"
 
 	"globe/internal/db/connection"
 	"globe/internal/db/models"
@@ -51,138 +50,26 @@ func InsertClustersAndMappings(clusters []models.Cluster) error {
 
 // GetHierarchicalClusters ดึง clusters แบบ hierarchical ตาม viewport และ filter
 func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error) {
-	log.Println("[DEBUG] Start querying hierarchical clusters")
+	log.Println("[DEBUG] Start querying hierarchical clusters (recursive BBOX & date)")
 
-	// 1. ดึง clusters ระดับบนสุด (0-2) ที่อยู่ใน viewport
+	// 1. Query cluster ทั้งหมดที่ level <= max_level พร้อม min/max lat/lon, min/max date
 	baseQuery := `
-		WITH RECURSIVE cluster_tree AS (
-			-- Base case: เลือก clusters ระดับบนสุดที่อยู่ใน viewport
-			SELECT 
-				c.cluster_id,
-				c.parent_cluster_id,
-				c.centroid_lat,
-				c.centroid_lon,
-				c.level,
-				ARRAY_AGG(DISTINCT e.event_id) as event_ids,
-				ARRAY[c.cluster_id] as path,
-				0 as depth
-			FROM cluster c
-			LEFT JOIN eventclustermap ecm ON c.cluster_id = ecm.cluster_id
-			LEFT JOIN event e ON ecm.event_id = e.event_id
-			WHERE c.level <= $1
-			AND c.centroid_lat <= $2 AND c.centroid_lat >= $3
-			AND c.centroid_lon <= $4 AND c.centroid_lon >= $5
-			AND c.parent_cluster_id IS NULL
-			GROUP BY c.cluster_id, c.parent_cluster_id, c.centroid_lat, c.centroid_lon, c.level
-
-			UNION ALL
-
-			-- Recursive case: ดึง child clusters
-			SELECT 
-				c.cluster_id,
-				c.parent_cluster_id,
-				c.centroid_lat,
-				c.centroid_lon,
-				c.level,
-				(SELECT ARRAY_AGG(DISTINCT e.event_id)
-				 FROM eventclustermap ecm
-				 LEFT JOIN event e ON ecm.event_id = e.event_id
-				 WHERE ecm.cluster_id = c.cluster_id) as event_ids,
-				ct.path || c.cluster_id,
-				ct.depth + 1
-			FROM cluster c
-			JOIN cluster_tree ct ON c.parent_cluster_id = ct.cluster_id
-			WHERE c.level <= $1
-			AND c.centroid_lat <= $2 AND c.centroid_lat >= $3
-			AND c.centroid_lon <= $4 AND c.centroid_lon >= $5
-		)
+		SELECT 
+    		c.cluster_id,
+    		c.parent_cluster_id,
+    		c.centroid_lat,
+    		c.centroid_lon,
+    		c.centroid_time_days,
+    		c.level,
+    				ARRAY_AGG(DISTINCT ecm.event_id) as event_ids,
+    		c.min_lat, c.max_lat, c.min_lon, c.max_lon,
+    		c.min_date, c.max_date
+		FROM cluster c
+		LEFT JOIN eventclustermap ecm ON c.cluster_id = ecm.cluster_id
+		WHERE c.level <= $1
+		GROUP BY c.cluster_id, c.parent_cluster_id, c.centroid_lat, c.centroid_lon, c.centroid_time_days, c.level, c.min_lat, c.max_lat, c.min_lon, c.max_lon, c.min_date, c.max_date
 	`
-
-	// 2. เพิ่มเงื่อนไข filter tags ถ้ามี
-	filterConditions := ""
-	args := []interface{}{
-		query.MaxLevel,
-		query.Viewport.North,
-		query.Viewport.South,
-		query.Viewport.East,
-		query.Viewport.West,
-	}
-	argCount := 6
-
-	// 2.1 เพิ่มเงื่อนไข filter tags
-	if query.TagFilter != nil {
-		if len(query.TagFilter.Tags) > 0 {
-			operator := query.TagFilter.Operator
-			if operator != "AND" && operator != "OR" {
-				operator = "OR" // default เป็น OR
-			}
-
-			if operator == "AND" {
-				for _, tag := range query.TagFilter.Tags {
-					filterConditions += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id JOIN eventtag et ON e.event_id = et.event_id JOIN tag t ON et.tag_id = t.tag_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND t.tag_name ILIKE $%d)", argCount)
-					args = append(args, "%"+tag+"%")
-					argCount++
-				}
-			} else {
-				orConds := []string{}
-				for _, tag := range query.TagFilter.Tags {
-					orConds = append(orConds, fmt.Sprintf("t.tag_name ILIKE $%d", argCount))
-					args = append(args, "%"+tag+"%")
-					argCount++
-				}
-				filterConditions += " AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id JOIN eventtag et ON e.event_id = et.event_id JOIN tag t ON et.tag_id = t.tag_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND (" + strings.Join(orConds, " OR ") + "))"
-			}
-		}
-	}
-
-	// 2.2 เพิ่มเงื่อนไข filter date
-	if query.DateFilter != nil {
-		if query.DateFilter.Year != nil {
-			filterConditions += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND EXTRACT(YEAR FROM e.date) = $%d)", argCount)
-			args = append(args, *query.DateFilter.Year)
-			argCount++
-		} else {
-			if query.DateFilter.StartDate != nil {
-				filterConditions += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND e.date >= $%d)", argCount)
-				args = append(args, query.DateFilter.StartDate)
-				argCount++
-			}
-			if query.DateFilter.EndDate != nil {
-				filterConditions += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM event e JOIN eventclustermap ecm ON e.event_id = ecm.event_id WHERE ecm.cluster_id = ANY(ct.event_ids) AND e.date <= $%d)", argCount)
-				args = append(args, query.DateFilter.EndDate)
-				argCount++
-			}
-		}
-	}
-
-	// 3. สร้าง query สุดท้าย
-	finalQuery := baseQuery + `
-		SELECT DISTINCT ON (ct.cluster_id)
-			ct.cluster_id,
-			ct.parent_cluster_id,
-			ct.centroid_lat,
-			ct.centroid_lon,
-			TO_CHAR(
-				TO_TIMESTAMP(AVG(EXTRACT(EPOCH FROM e.date))),
-				'YYYY-MM-DD'
-			) as centroid_time_days,
-			ct.level,
-			ct.event_ids
-		FROM cluster_tree ct
-		LEFT JOIN eventclustermap ecm ON ct.cluster_id = ecm.cluster_id
-		LEFT JOIN event e ON ecm.event_id = e.event_id
-		WHERE 1=1 ` + filterConditions + `
-		GROUP BY ct.cluster_id, ct.parent_cluster_id, ct.centroid_lat, ct.centroid_lon, ct.level, ct.event_ids
-		ORDER BY ct.cluster_id
-	`
-
-	if query.MaxClusters != nil {
-		finalQuery += fmt.Sprintf(" LIMIT $%d", argCount)
-		args = append(args, *query.MaxClusters)
-	}
-
-	// 4. Execute query
-	rows, err := connection.DB.Query(context.Background(), finalQuery, args...)
+	rows, err := connection.DB.Query(context.Background(), baseQuery, query.MaxLevel)
 	if err != nil {
 		log.Printf("[ERROR] Query failed: %v", err)
 		return nil, err
@@ -190,6 +77,9 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 	defer rows.Close()
 
 	var clusters []models.Cluster
+	parentMap := make(map[int][]models.Cluster)
+	clusterMap := make(map[int]models.Cluster)
+
 	for rows.Next() {
 		var cluster models.Cluster
 		err := rows.Scan(
@@ -200,19 +90,75 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 			&cluster.CentroidTimeDays,
 			&cluster.Level,
 			&cluster.EventIDs,
+			&cluster.MinLat, &cluster.MaxLat, &cluster.MinLon, &cluster.MaxLon,
+			&cluster.MinDate, &cluster.MaxDate,
 		)
 		if err != nil {
 			log.Printf("[ERROR] Scanning row failed: %v", err)
 			continue
 		}
 		clusters = append(clusters, cluster)
+		pid := 0
+		if cluster.ParentClusterID != nil {
+			pid = *cluster.ParentClusterID
+		}
+		parentMap[pid] = append(parentMap[pid], cluster)
+		clusterMap[cluster.ClusterID] = cluster
 	}
-
 	if err := rows.Err(); err != nil {
 		log.Printf("[ERROR] Rows error: %v", err)
 		return nil, err
 	}
 
-	log.Printf("[DEBUG] Total clusters fetched: %d", len(clusters))
-	return clusters, nil
+	// Helper: ตรวจสอบว่า cluster เป็น leaf (ไม่มีลูก)
+	isLeaf := func(clusterID int) bool {
+		children, ok := parentMap[clusterID]
+		return !ok || len(children) == 0
+	}
+
+	// 2. Recursive filter
+	var result []models.Cluster
+	var traverse func(parentID int)
+	traverse = func(parentID int) {
+		for _, c := range parentMap[parentID] {
+			// เช็ค BBOX กับ viewport
+			if c.MaxLat == nil || c.MinLat == nil || c.MaxLon == nil || c.MinLon == nil {
+				continue // ไม่มี event ใน cluster นี้
+			}
+			if *c.MaxLat < query.Viewport.South || *c.MinLat > query.Viewport.North ||
+				*c.MaxLon < query.Viewport.West || *c.MinLon > query.Viewport.East {
+				continue
+			}
+			// เช็คช่วงเวลา
+			if c.MaxDate == nil || c.MinDate == nil {
+				continue
+			}
+			if query.DateFilter != nil {
+				if query.DateFilter.Year != nil {
+					year := *query.DateFilter.Year
+					start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+					end := time.Date(year, 12, 31, 23, 59, 59, 0, time.UTC)
+					if c.MaxDate.Before(start) || c.MinDate.After(end) {
+						continue
+					}
+				} else if query.DateFilter.StartDate != nil && query.DateFilter.EndDate != nil {
+					if c.MaxDate.Before(*query.DateFilter.StartDate) || c.MinDate.After(*query.DateFilter.EndDate) {
+						continue
+					}
+				}
+			}
+			// ถ้าเป็น leaf (ไม่มีลูก) → ดึง event ที่เข้าเงื่อนไข (สามารถ filter เพิ่มเติมได้ที่นี่)
+			if isLeaf(c.ClusterID) {
+				// (Optional) filter event รายตัวที่อยู่ใน viewport/ช่วงเวลา
+				// ...
+			} else {
+				traverse(c.ClusterID)
+			}
+			result = append(result, c)
+		}
+	}
+	traverse(0) // เริ่มจาก root (parentID = 0)
+
+	log.Printf("[DEBUG] Total clusters after recursive filter: %d", len(result))
+	return result, nil
 }

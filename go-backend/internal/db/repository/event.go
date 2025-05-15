@@ -21,8 +21,8 @@ func GetFilteredEvents(filter models.EventFilter) ([]models.EventResponse, error
 			e.lat,
 			e.lon,
 			e.description,
-			ARRAY_AGG(DISTINCT t.tag_name) as tags,
-			ARRAY_AGG(DISTINCT ecm.cluster_id) as clusters
+			COALESCE(ARRAY_AGG(DISTINCT t.tag_name) FILTER (WHERE t.tag_name IS NOT NULL), ARRAY[]::text[]) as tags,
+			COALESCE(ARRAY_AGG(DISTINCT ecm.cluster_id) FILTER (WHERE ecm.cluster_id IS NOT NULL), ARRAY[]::int[]) as clusters
 		FROM event e
 		LEFT JOIN eventtag et ON e.event_id = et.event_id
 		LEFT JOIN tag t ON et.tag_id = t.tag_id
@@ -35,28 +35,26 @@ func GetFilteredEvents(filter models.EventFilter) ([]models.EventResponse, error
 	argCount := 1
 
 	// 2.1 เพิ่มเงื่อนไข filter tags
-	if filter.TagFilter != nil {
-		if len(filter.TagFilter.Tags) > 0 {
-			operator := filter.TagFilter.Operator
-			if operator != "AND" && operator != "OR" {
-				operator = "OR" // default เป็น OR
-			}
+	if filter.TagFilter != nil && len(filter.TagFilter.Tags) > 0 {
+		operator := filter.TagFilter.Operator
+		if operator != "AND" && operator != "OR" {
+			operator = "OR" // default เป็น OR
+		}
 
-			if operator == "AND" {
-				for _, tag := range filter.TagFilter.Tags {
-					query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM eventtag et2 JOIN tag t2 ON et2.tag_id = t2.tag_id WHERE et2.event_id = e.event_id AND t2.tag_name ILIKE $%d)", argCount)
-					args = append(args, "%"+tag+"%")
-					argCount++
-				}
-			} else {
-				orConds := []string{}
-				for _, tag := range filter.TagFilter.Tags {
-					orConds = append(orConds, fmt.Sprintf("t2.tag_name ILIKE $%d", argCount))
-					args = append(args, "%"+tag+"%")
-					argCount++
-				}
-				query += " AND EXISTS (SELECT 1 FROM eventtag et2 JOIN tag t2 ON et2.tag_id = t2.tag_id WHERE et2.event_id = e.event_id AND (" + strings.Join(orConds, " OR ") + "))"
+		if operator == "AND" {
+			for _, tag := range filter.TagFilter.Tags {
+				query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM eventtag et2 JOIN tag t2 ON et2.tag_id = t2.tag_id WHERE et2.event_id = e.event_id AND t2.tag_name ILIKE $%d)", argCount)
+				args = append(args, "%"+tag+"%")
+				argCount++
 			}
+		} else {
+			orConds := []string{}
+			for _, tag := range filter.TagFilter.Tags {
+				orConds = append(orConds, fmt.Sprintf("t2.tag_name ILIKE $%d", argCount))
+				args = append(args, "%"+tag+"%")
+				argCount++
+			}
+			query += " AND EXISTS (SELECT 1 FROM eventtag et2 JOIN tag t2 ON et2.tag_id = t2.tag_id WHERE et2.event_id = e.event_id AND (" + strings.Join(orConds, " OR ") + "))"
 		}
 	}
 
@@ -125,6 +123,7 @@ func GetFilteredEvents(filter models.EventFilter) ([]models.EventResponse, error
 	// Debug: Print number of results
 	log.Printf("[DEBUG] Found %d events", len(events))
 
+	// แก้ไขค่า NaN เป็น 0
 	for i := range events {
 		if math.IsNaN(events[i].Lat) {
 			events[i].Lat = 0

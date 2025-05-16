@@ -43,6 +43,9 @@ type Cluster struct {
 	CentroidTimeDays string     `json:"centroid_time_days"`
 	Level            int        `json:"level"`
 	EventIDs         []int      `json:"event_ids"`
+
+	Events           []EventResponse `json:"events"`
+	
 	MinLat           *float64   `json:"min_lat"`
 	MaxLat           *float64   `json:"max_lat"`
 	MinLon           *float64   `json:"min_lon"`
@@ -80,4 +83,34 @@ type TagFilter struct {
 type EventFilter struct {
 	TagFilter  *TagFilter  `json:"tag_filter"`  // ตัวเลือกสำหรับ filter tags
 	DateFilter *DateFilter `json:"date_filter"` // ตัวเลือกสำหรับ filter วันที่
+}
+
+type EventFull struct {
+	EventID     int      `json:"event_id"`
+	EventName   string   `json:"event_name"`
+	Description string   `json:"description"`
+	Date        string   `json:"date"`
+	Lat         float64  `json:"lat"`
+	Lon         float64  `json:"lon"`
+	Image       string   `json:"image"`
+	Video       string   `json:"video"`
+	Tags        []string `json:"tags"`
+	Clusters    []int    `json:"clusters"`
+}
+
+
+type ClusterResponse struct {
+	ClusterID         int          `json:"cluster_id"`
+	ParentClusterID   *int         `json:"parent_cluster_id"`
+	CentroidLat       float64      `json:"centroid_lat"`
+	CentroidLon       float64      `json:"centroid_lon"`
+	CentroidTimeDays  float64      `json:"centroid_time_days"`
+	Level             int          `json:"level"`
+	MinDate           time.Time    `json:"min_date"`
+	MaxDate           time.Time    `json:"max_date"`
+	MinLat            float64      `json:"min_lat"`
+	MaxLat            float64      `json:"max_lat"`
+	MinLon            float64      `json:"min_lon"`
+	MaxLon            float64      `json:"max_lon"`
+	Events            []EventFull  `json:"events"` // สำคัญ!
 }

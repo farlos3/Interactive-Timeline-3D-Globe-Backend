@@ -45,7 +45,7 @@ func GetHierarchicalClustersHandler(c *fiber.Ctx) error {
 
 	// Set default max_level to 4 if not provided
 	if query.MaxLevel == 0 {
-		query.MaxLevel = 4
+		query.MaxLevel = 5
 	}
 
 	// Validate max_level

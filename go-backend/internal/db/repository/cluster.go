@@ -52,22 +52,21 @@ func InsertClustersAndMappings(clusters []models.Cluster) error {
 func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error) {
 	log.Println("[DEBUG] Start querying hierarchical clusters (recursive BBOX & date)")
 
-	// 1. Query cluster ทั้งหมดที่ level <= max_level พร้อม min/max lat/lon, min/max date
 	baseQuery := `
 		SELECT 
-    		c.cluster_id,
-    		c.parent_cluster_id,
-    		c.centroid_lat,
-    		c.centroid_lon,
-    		c.centroid_time_days,
-    		c.level,
-    				ARRAY_AGG(DISTINCT ecm.event_id) as event_ids,
-    		c.min_lat, c.max_lat, c.min_lon, c.max_lon,
-    		c.min_date, c.max_date
+			c.cluster_id,
+			c.parent_cluster_id,
+			c.centroid_lat,
+			c.centroid_lon,
+			c.centroid_time_days,
+			c.level,
+			ARRAY_AGG(DISTINCT ecm.event_id) as event_ids,
+			c.min_lat, c.max_lat, c.min_lon, c.max_lon,
+			c.min_date, c.max_date
 		FROM cluster c
 		LEFT JOIN eventclustermap ecm ON c.cluster_id = ecm.cluster_id
 		WHERE c.level <= $1
-		GROUP BY c.cluster_id, c.parent_cluster_id, c.centroid_lat, c.centroid_lon, c.centroid_time_days, c.level, c.		min_lat, c.max_lat, c.min_lon, c.max_lon, c.min_date, c.max_date
+		GROUP BY c.cluster_id, c.parent_cluster_id, c.centroid_lat, c.centroid_lon, c.centroid_time_days, c.level, c.min_lat, c.max_lat, c.min_lon, c.max_lon, c.min_date, c.max_date
 	`
 	rows, err := connection.DB.Query(context.Background(), baseQuery, query.MaxLevel)
 	if err != nil {
@@ -105,31 +104,43 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 		parentMap[pid] = append(parentMap[pid], cluster)
 		clusterMap[cluster.ClusterID] = cluster
 	}
+
 	if err := rows.Err(); err != nil {
 		log.Printf("[ERROR] Rows error: %v", err)
 		return nil, err
 	}
 
-	// Helper: ตรวจสอบว่า cluster เป็น leaf (ไม่มีลูก)
+	// Load event details map
+	allEventIDs := make(map[int]struct{})
+	for _, c := range clusters {
+		for _, eid := range c.EventIDs {
+			allEventIDs[eid] = struct{}{}
+		}
+	}
+	eventDetails, err := loadEventDetails(allEventIDs)
+	if err != nil {
+		log.Printf("[ERROR] loading event details failed: %v", err)
+		return nil, err
+	}
+
 	isLeaf := func(clusterID int) bool {
 		children, ok := parentMap[clusterID]
 		return !ok || len(children) == 0
 	}
 
-	// 2. Recursive filter
 	var result []models.Cluster
 	var traverse func(parentID int)
 	traverse = func(parentID int) {
 		for _, c := range parentMap[parentID] {
-			// เช็ค BBOX กับ viewport
+			// Filter BBOX
 			if c.MaxLat == nil || c.MinLat == nil || c.MaxLon == nil || c.MinLon == nil {
-				continue // ไม่มี event ใน cluster นี้
+				continue
 			}
 			if *c.MaxLat < query.Viewport.South || *c.MinLat > query.Viewport.North ||
 				*c.MaxLon < query.Viewport.West || *c.MinLon > query.Viewport.East {
 				continue
 			}
-			// เช็คช่วงเวลา
+			// Filter Date
 			if c.MaxDate == nil || c.MinDate == nil {
 				continue
 			}
@@ -147,18 +158,70 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 					}
 				}
 			}
-			// ถ้าเป็น leaf (ไม่มีลูก) → ดึง event ที่เข้าเงื่อนไข (สามารถ filter เพิ่มเติมได้ที่นี่)
+
+			// Attach events only for leaf
 			if isLeaf(c.ClusterID) {
-				// (Optional) filter event รายตัวที่อยู่ใน viewport/ช่วงเวลา
-				// ...
+				for _, eid := range c.EventIDs {
+					if ev, ok := eventDetails[eid]; ok {
+						c.Events = append(c.Events, ev)
+					}
+				}
 			} else {
 				traverse(c.ClusterID)
 			}
+
 			result = append(result, c)
 		}
 	}
-	traverse(0) // เริ่มจาก root (parentID = 0)
+	traverse(0)
 
-	log.Printf("[DEBUG] Total clusters after recursive filter: %d", len(result))
+	log.Printf("[DEBUG] Total clusters after filter: %d", len(result))
 	return result, nil
+}
+
+// loadEventDetails คืน map[event_id]EventResponse
+func loadEventDetails(idSet map[int]struct{}) (map[int]models.EventResponse, error) {
+	if len(idSet) == 0 {
+		return map[int]models.EventResponse{}, nil
+	}
+	ids := make([]int, 0, len(idSet))
+	for id := range idSet {
+		ids = append(ids, id)
+	}
+
+	const q = `
+		SELECT
+			e.event_id,
+			e.event_name,
+			e.date,
+			e.lat,
+			e.lon,
+			e.image,
+			e.video,
+			e.description,
+			COALESCE(ARRAY_AGG(DISTINCT et.tag_id)      FILTER (WHERE et.tag_id IS NOT NULL), '{}')  AS tags,
+			COALESCE(ARRAY_AGG(DISTINCT ecm.cluster_id) FILTER (WHERE ecm.cluster_id IS NOT NULL), '{}') AS clusters
+		FROM event            e
+		LEFT JOIN eventtag   et  ON e.event_id = et.event_id
+		LEFT JOIN eventclustermap ecm ON e.event_id = ecm.event_id
+		WHERE e.event_id = ANY($1)
+		GROUP BY e.event_id;
+	`
+
+	rows, err := connection.DB.Query(context.Background(), q, ids)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	out := make(map[int]models.EventResponse)
+	for rows.Next() {
+		var ev models.EventResponse
+		if err := rows.Scan(
+			&ev.EventID, &ev.EventName, &ev.Date, &ev.Lat, &ev.Lon,
+			&ev.Image, &ev.Video, &ev.Description, &ev.Tags, &ev.Clusters,
+		); err != nil {
+			return nil, err
+		}
+		out[ev.EventID] = ev
+	}
+	return out, nil
 }

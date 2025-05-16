@@ -45,7 +45,6 @@ type Cluster struct {
 	EventIDs         []int      `json:"event_ids"`
 
 	Events           []EventResponse `json:"events"`
-	
 	MinLat           *float64   `json:"min_lat"`
 	MaxLat           *float64   `json:"max_lat"`
 	MinLon           *float64   `json:"min_lon"`

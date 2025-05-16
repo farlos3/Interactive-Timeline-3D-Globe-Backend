@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"globe/internal/db/connection"
@@ -129,6 +130,7 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 	}
 
 	var result []models.Cluster
+	usedEventIDs := make(map[int]struct{}) // เก็บ event ที่ถูกใช้ไปแล้ว
 	var traverse func(parentID int)
 	traverse = func(parentID int) {
 		for _, c := range parentMap[parentID] {
@@ -159,11 +161,42 @@ func GetHierarchicalClusters(query models.ClusterQuery) ([]models.Cluster, error
 				}
 			}
 
-			// Attach events only for leaf
+			// Attach events only for leaf, และไม่ซ้ำ event
 			if isLeaf(c.ClusterID) {
 				for _, eid := range c.EventIDs {
+					if _, used := usedEventIDs[eid]; used {
+						continue // ข้าม event ที่ถูกใช้ไปแล้ว
+					}
 					if ev, ok := eventDetails[eid]; ok {
+						if query.DateFilter != nil && query.DateFilter.Year != nil {
+							if ev.Date.Year() != *query.DateFilter.Year {
+								continue
+							}
+						}
+						// เพิ่ม filter tag
+						if query.TagFilter != nil && len(query.TagFilter.Tags) > 0 {
+							tagSet := make(map[string]struct{})
+							// สร้าง set ของ tag ทั้งหมดใน event (normalize)
+							for _, evTag := range ev.Tags {
+								for _, singleTag := range strings.Split(evTag, ",") {
+									evTagNorm := strings.ToLower(strings.TrimSpace(singleTag))
+									tagSet[evTagNorm] = struct{}{}
+								}
+							}
+							allMatch := true
+							for _, tag := range query.TagFilter.Tags {
+								tagNorm := strings.ToLower(strings.TrimSpace(tag))
+								if _, ok := tagSet[tagNorm]; !ok {
+									allMatch = false
+									break
+								}
+							}
+							if !allMatch {
+								continue
+							}
+						}
 						c.Events = append(c.Events, ev)
+						usedEventIDs[eid] = struct{}{}
 					}
 				}
 			} else {
@@ -199,17 +232,20 @@ func loadEventDetails(idSet map[int]struct{}) (map[int]models.EventResponse, err
 			e.image,
 			e.video,
 			e.description,
-			COALESCE(ARRAY_AGG(DISTINCT et.tag_id)      FILTER (WHERE et.tag_id IS NOT NULL), '{}')  AS tags,
+			COALESCE(ARRAY_AGG(DISTINCT t.tag_name) FILTER (WHERE t.tag_name IS NOT NULL), '{}')  AS tags,
 			COALESCE(ARRAY_AGG(DISTINCT ecm.cluster_id) FILTER (WHERE ecm.cluster_id IS NOT NULL), '{}') AS clusters
 		FROM event            e
 		LEFT JOIN eventtag   et  ON e.event_id = et.event_id
+		LEFT JOIN tag        t   ON et.tag_id = t.tag_id
 		LEFT JOIN eventclustermap ecm ON e.event_id = ecm.event_id
 		WHERE e.event_id = ANY($1)
 		GROUP BY e.event_id;
 	`
 
 	rows, err := connection.DB.Query(context.Background(), q, ids)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	out := make(map[int]models.EventResponse)

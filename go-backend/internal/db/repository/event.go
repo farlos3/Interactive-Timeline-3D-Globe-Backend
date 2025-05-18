@@ -135,3 +135,47 @@ func GetFilteredEvents(filter models.EventFilter) ([]models.EventResponse, error
 
 	return events, nil
 }
+
+// GetEventClusterMapping fetches individual event-cluster relationships
+func GetEventClusterMapping() ([]models.EventClusterMapping, error) {
+	query := `
+		SELECT 
+			e.event_id,
+			c.cluster_id,
+			c.parent_cluster_id
+		FROM event e
+		JOIN eventclustermap ecm ON e.event_id = ecm.event_id
+		JOIN cluster c ON ecm.cluster_id = c.cluster_id
+		ORDER BY e.event_id, c.cluster_id
+	`
+
+	rows, err := connection.DB.Query(context.Background(), query)
+	if err != nil {
+		log.Printf("[ERROR] Query failed: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mappings []models.EventClusterMapping
+	for rows.Next() {
+		var mapping models.EventClusterMapping
+		err := rows.Scan(
+			&mapping.EventID,
+			&mapping.ClusterID,
+			&mapping.ParentClusterID,
+		)
+		if err != nil {
+			log.Printf("[ERROR] Scanning row failed: %v", err)
+			continue
+		}
+		mappings = append(mappings, mapping)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("[ERROR] Rows error: %v", err)
+		return nil, err
+	}
+
+	log.Printf("[DEBUG] Found %d event-cluster mappings", len(mappings))
+	return mappings, nil
+}

@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"globe/internal/history/handlers"
+	handler "globe/internal/history/handlers"
 	"globe/internal/pyservice"
 
 	"github.com/gofiber/fiber/v2"
@@ -22,6 +22,8 @@ func RegisterRoutes(app *fiber.App) {
 	api.Post("/insert-clusters", handler.InsertClustersHandler)
 	api.Post("/events/filter", handler.GetFilteredEventsHandler)
 	api.Post("/clusters/hierarchical", handler.GetHierarchicalClustersHandler)
+	api.Get("/events/cluster-mapping", handler.GetEventClusterMappingHandler)
+	api.Get("/events/cluster-mapping/csv", handler.GetEventClusterMappingCSVHandler)
 
 	// Python service routes
 	pythonHandler := pyservice.NewHandler()

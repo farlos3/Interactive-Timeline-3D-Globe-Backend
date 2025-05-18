@@ -36,21 +36,21 @@ type EventResponse struct {
 }
 
 type Cluster struct {
-	ClusterID        int        `json:"cluster_id"`
-	ParentClusterID  *int       `json:"parent_cluster_id"`
-	CentroidLat      float64    `json:"centroid_lat"`
-	CentroidLon      float64    `json:"centroid_lon"`
-	CentroidTimeDays string     `json:"centroid_time_days"`
-	Level            int        `json:"level"`
-	EventIDs         []int      `json:"event_ids"`
+	ClusterID        int     `json:"cluster_id"`
+	ParentClusterID  *int    `json:"parent_cluster_id"`
+	CentroidLat      float64 `json:"centroid_lat"`
+	CentroidLon      float64 `json:"centroid_lon"`
+	CentroidTimeDays string  `json:"centroid_time_days"`
+	Level            int     `json:"level"`
+	EventIDs         []int   `json:"event_ids"`
 
-	Events           []EventResponse `json:"events"`
-	MinLat           *float64   `json:"min_lat"`
-	MaxLat           *float64   `json:"max_lat"`
-	MinLon           *float64   `json:"min_lon"`
-	MaxLon           *float64   `json:"max_lon"`
-	MinDate          *time.Time `json:"min_date"`
-	MaxDate          *time.Time `json:"max_date"`
+	Events  []EventResponse `json:"events"`
+	MinLat  *float64        `json:"min_lat"`
+	MaxLat  *float64        `json:"max_lat"`
+	MinLon  *float64        `json:"min_lon"`
+	MaxLon  *float64        `json:"max_lon"`
+	MinDate *time.Time      `json:"min_date"`
+	MaxDate *time.Time      `json:"max_date"`
 }
 
 type Viewport struct {
@@ -97,19 +97,24 @@ type EventFull struct {
 	Clusters    []int    `json:"clusters"`
 }
 
-
 type ClusterResponse struct {
-	ClusterID         int          `json:"cluster_id"`
-	ParentClusterID   *int         `json:"parent_cluster_id"`
-	CentroidLat       float64      `json:"centroid_lat"`
-	CentroidLon       float64      `json:"centroid_lon"`
-	CentroidTimeDays  float64      `json:"centroid_time_days"`
-	Level             int          `json:"level"`
-	MinDate           time.Time    `json:"min_date"`
-	MaxDate           time.Time    `json:"max_date"`
-	MinLat            float64      `json:"min_lat"`
-	MaxLat            float64      `json:"max_lat"`
-	MinLon            float64      `json:"min_lon"`
-	MaxLon            float64      `json:"max_lon"`
-	Events            []EventFull  `json:"events"` // สำคัญ!
+	ClusterID        int         `json:"cluster_id"`
+	ParentClusterID  *int        `json:"parent_cluster_id"`
+	CentroidLat      float64     `json:"centroid_lat"`
+	CentroidLon      float64     `json:"centroid_lon"`
+	CentroidTimeDays float64     `json:"centroid_time_days"`
+	Level            int         `json:"level"`
+	MinDate          time.Time   `json:"min_date"`
+	MaxDate          time.Time   `json:"max_date"`
+	MinLat           float64     `json:"min_lat"`
+	MaxLat           float64     `json:"max_lat"`
+	MinLon           float64     `json:"min_lon"`
+	MaxLon           float64     `json:"max_lon"`
+	Events           []EventFull `json:"events"` // สำคัญ!
+}
+
+type EventClusterMapping struct {
+	EventID         int  `json:"event_id"`
+	ClusterID       int  `json:"cluster_id"`
+	ParentClusterID *int `json:"parent_cluster_id"`
 }

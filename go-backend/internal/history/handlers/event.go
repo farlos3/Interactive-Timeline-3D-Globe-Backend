@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"globe/internal/db/models"
 	"globe/internal/db/repository"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -48,10 +50,66 @@ func GetFilteredEventsHandler(c *fiber.Ctx) error {
 		})
 	}
 
-
 	return c.JSON(Response{
 		Status:  "success",
 		Message: "Events fetched successfully",
 		Data:    events,
 	})
+}
+
+// GetEventClusterMappingHandler handles GET request for event cluster mapping data
+func GetEventClusterMappingHandler(c *fiber.Ctx) error {
+	mappings, err := repository.GetEventClusterMapping()
+	if err != nil {
+		log.Printf("[ERROR] Failed to get event cluster mappings: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(Response{
+			Status:  "error",
+			Message: "Failed to get event cluster mappings",
+			Data:    nil,
+		})
+	}
+
+	return c.JSON(Response{
+		Status:  "success",
+		Message: "Successfully retrieved event cluster mappings",
+		Data:    mappings,
+	})
+}
+
+// GetEventClusterMappingCSVHandler handles GET request for event cluster mapping data in CSV format
+func GetEventClusterMappingCSVHandler(c *fiber.Ctx) error {
+	mappings, err := repository.GetEventClusterMapping()
+	if err != nil {
+		log.Printf("[ERROR] Failed to get event cluster mappings: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(Response{
+			Status:  "error",
+			Message: "Failed to get event cluster mappings",
+			Data:    nil,
+		})
+	}
+
+	// สร้าง CSV header
+	csvData := "event_id,cluster_id,parent_cluster_id\n"
+
+	// เพิ่มข้อมูลแต่ละแถว
+	for _, mapping := range mappings {
+		// แปลง parent_cluster_id เป็น string (ถ้าเป็น nil ให้เป็นค่าว่าง)
+		parentClusterIDStr := ""
+		if mapping.ParentClusterID != nil {
+			parentClusterIDStr = fmt.Sprintf("%d", *mapping.ParentClusterID)
+		}
+
+		// สร้างแถว CSV
+		csvData += fmt.Sprintf("%d,%d,%s\n",
+			mapping.EventID,
+			mapping.ClusterID,
+			parentClusterIDStr,
+		)
+	}
+
+	// ตั้งค่า header สำหรับการดาวน์โหลดไฟล์ CSV
+	c.Set("Content-Type", "text/csv")
+	c.Set("Content-Disposition", "attachment; filename=event_cluster_mapping.csv")
+
+	return c.SendString(csvData)
 }

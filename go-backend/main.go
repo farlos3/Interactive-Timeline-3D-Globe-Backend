@@ -60,7 +60,7 @@ func main() {
 	}
 
 	goPort := os.Getenv("GO_PORT")
-	
+
 	log.Printf("🌐 Server is running on http://localhost:%s", goPort)
 	if err := app.Listen(":" + goPort); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

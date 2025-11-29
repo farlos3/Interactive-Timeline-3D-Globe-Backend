@@ -2,7 +2,7 @@ import numpy as np
 from datetime import datetime
 from .distance import gaussian
 
-def normalize_date_with_gaussian(date_str, min_date, war_years=[(1914, 1918), (1939, 1945)], sigma=300):
+def normalize_date_with_gaussian(date_str, min_date, war_years=[(1914, 1918), (1939, 1945)], sigma=183):
     if isinstance(date_str, float) or isinstance(date_str, int):
         date_str = str(int(date_str))
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
